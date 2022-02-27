@@ -10,9 +10,7 @@ The structure of the cleaned data files is as follows:
     bloom_date date of peak bloom of the cherry trees (ISO 8601 date string). The "peak bloom date" may be defined differently for different locations.
     bloom_doy days since January 1st of the year until peak bloom (integer). January 1st is 1.
 
-2. Data sources
-
-1) Washington, D.C. (USA)
+2. Washington, D.C. (USA)
 
 The data in file washingntondc.csv has been obtained from https://www.epa.gov/climate-indicators/cherry-blossoms. 
 The latitude and longitude correspond to the location of the Tidal Basin in Washington, DC and the cherry trees are approximately at sea level (altitude 0).
@@ -22,7 +20,7 @@ Copyright notice
 
 Sourced from EPA's Climate Change Indicators in the United States: https://www.epa.gov/climate-indicators/cherry-blossoms. See the source for copyright details.
 
-2) Liestal-Weideli (Switzerland)
+3. Liestal-Weideli (Switzerland)
 
 The data in the file liestal.csv is The cherry trees in Liestal-Weideli are of species Prunus avium (wild cherry).
 
@@ -34,7 +32,7 @@ Copyright by Landwirtschaftliches Zentrum Ebenrain, Sissach and MeteoSwiss.
     You may use this dataset for non-commercial purposes.
     You must provide the source ("Source: Landwirtschaftliches Zentrum Ebenrain, Sissach and MeteoSwiss")
 
-3) Kyoto (Japan)
+4. Kyoto (Japan)
 
 The data has been obtained from http://atmenv.envi.osakafu-u.ac.jp/aono/kyophenotemp4/. The geographical location (longitude, latitude, altitude) roughly corresponds to the Nakanoshima area of the Arashiyama Park in Kyoto, Japan.
 
@@ -46,7 +44,7 @@ Copyright holder Yasuyuki AONO (aono(at)envi.osakafu-u.ac.jp). The data was obta
     Data from the 9th to the 14th centuries was acquired and analyzed by Aono and Saito (2010; International Journal of Biometeorology, 54, 211-219).
     Phenology for 15th to 21st centuries was acquired and analyzed by Aono and Kazui (2008; International Journal of Climatology, 28, 905-914).
     
-4) City_populations
+5. City_populations
 
 It includes only the four cities, which is from UN World Urbanization Prospects (https://population.un.org/wup/Download/).
     Four cities - Kyoto (Japan), Liestal-Weideli (Switzerland), Washington, D.C. (USA),  and Vancouver, BC (Canada)
