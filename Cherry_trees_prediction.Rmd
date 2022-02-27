@@ -1,0 +1,221 @@
+---
+title: "Prediction of Cherry Trees Blooming"
+author: "Asma Adimi, Moon Kum Seo, Joethi Silva Rojas, Jillian Wright"
+date: "02/22/2022"
+output:
+  pdf_document:
+    df_print: kable
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, error = FALSE, 
+                      message = FALSE,
+                      fig.align = 'center',
+                      out.width = '80%')
+```
+
+```{r}
+library(tidyverse)
+```
+
+## Loading the data
+
+```{r}
+cherry <- read.csv("data/kyoto.csv") %>%
+  bind_rows(read.csv("data/liestal.csv")) %>% 
+  bind_rows(read.csv("data/washingtondc.csv"))
+```
+
+## Visualizing the time series
+
+```{r, fig.width=8, fig.height=3, out.width='100%', fig.cap="Time series of peak bloom of cherry trees since 1950 at three different sites."}
+cherry %>% 
+  filter(year >= 1950) %>%
+  ggplot(aes(x = year, y = bloom_doy)) +
+  geom_point() +
+  geom_step(linetype = 'dotted', color = 'gray50') +
+  scale_x_continuous(breaks = seq(1950, 2020, by = 10)) +
+  facet_grid(cols = vars(str_to_title(location))) +
+  labs(x = "Year", y = "Peak bloom (days since Jan 1st)")
+```
+
+```{r}
+cherry <- cherry %>% 
+  group_by(location) %>%
+  filter(year >= 1950) %>%
+  select(location, year, bloom_doy)
+```
+
+## Getting the annual average maximum temperature
+
+```{r}
+library(rnoaa)
+```
+
+The list of stations can be retrieved using the `ghcnd_stations()` function. Note that the closest weather station to each city with continuously collected maximum temperatures are USC00186350 (Washington D.C.), GME00127786 (Liestal), JA000047759 (Kyoto), and CA001108395 (Vancouver).
+
+```{r, eval = FALSE}
+stations <- ghcnd_stations()
+```
+
+As a simple demonstration, we retrieve the average seasonal maximum daily temperature (in 1/10 °C) from these stations using our own `get_temperature()` function, which wraps the `ghcnd_search()` function in the `rnoaa` package. (N.b. `ghcnd_search()` returns a list. Each element of the list corresponds to an element of the `var` argument.)
+
+```{r}
+#' Get the annual average maximum temperature at the given station,
+#' separated into the 4 meteorological seasons (Winter, Spring, Summer, Fall).
+#' 
+#' The seasons are span 3 months each.
+#' Winter is from December to February, Spring from March to May,
+#' Summer from June to August, and Fall from September to November.
+#' Note that December is counted towards the Winter of the next year, i.e.,
+#' temperatures in December 2020 are accounted for in Winter 2021.
+#' 
+#' @param stationid the `rnoaa` station id (see [ghcnd_stations()])
+#' @return a data frame with columns
+#'   - `year` ... the year of the observations
+#'   - `season` ... the season (Winter, Spring, Summer, Fall)
+#'   - `tmax_avg` ... average maximum temperate in tenth degree Celsius
+get_temperature <- function (stationid) {
+  ghcnd_search(stationid = stationid, var = c("tmax"), 
+               date_min = "1950-01-01", date_max = "2022-01-31")[[1]] %>%
+  mutate(year = as.integer(format(date, "%Y")),
+         month = as.integer(strftime(date, '%m')) %% 12, # make December "0"
+         season = cut(month, breaks = c(0, 2, 5, 8, 11),
+                      include.lowest = TRUE,
+                      labels = c("Winter", "Spring", "Summer", "Fall")),
+         year = if_else(month == 0, year + 1L, year)) %>%
+  group_by(year, season) %>%
+  summarize(tmax_avg = mean(tmax, na.rm = TRUE))
+}
+
+historic_temperatures <-
+  tibble(location = "kyoto", get_temperature("JA000047759")) %>%
+  bind_rows(tibble(location = "liestal", get_temperature("GME00127786"))) %>%
+  bind_rows(tibble(location = "washingtondc", get_temperature("USC00186350"))) %>%
+  bind_rows(tibble(location = "vancouver", get_temperature("CA001108395")))
+```
+
+We then predict the peak bloom date in two steps. Step 1 extrapolates average winter and spring temperature until 2031 using simple linear regression. Step 2 predicts the peak bloom date given the extrapolated temperatures, again using simple linear regression. 
+
+## Extrapolating the average seasonal maximum temperature
+
+```{r}
+ls_fit_temperature <- lm(tmax_avg ~ year * season + location, 
+                         data = historic_temperatures)
+
+temperature_predictions <-
+  expand_grid(location = c("kyoto", "liestal", "washingtondc", "vancouver" ),
+              season = c("Winter", "Spring", "Summer", "Fall"),
+              year = 1950:2031) %>%
+  bind_cols(predicted_temperature = 
+              predict(ls_fit_temperature, newdata = .)) %>%
+  filter(season %in% c("Winter", "Spring")) %>%
+  pivot_wider(names_from = season, values_from = predicted_temperature)
+```
+
+## Extrapolating the population of each location
+
+The "city_populations.csv" file includes only the four cities, which is from UN World Urbanization Prospects (https://population.un.org/wup/Download/).
+Since the data gives the population in each city every 5 years, we need to extrapolate the population in each city every year by using the data from 1950 to 2035. And then, we use the population from 1950 to 2031 to predict cherry trees blooming days.
+
+```{r pop_extrapolate}
+pop <- read_csv("data/city_populations.csv")
+
+ggplot(pop %>% gather("city", "value", -year)) +
+  aes(x = year, y = value) +
+  geom_point() +
+  geom_smooth(method = "lm",
+              formula = y ~ poly(x, 3)) +
+  facet_wrap(~ city, scales = "free")
+ 
+order <- 5
+fit_kyoto <- lm(kyoto ~ poly(year, order), data = pop)
+fit_liestal <- lm(liestal ~ poly(year, order), data = pop)
+fit_washingtondc <- lm(washingtondc ~ poly(year, order), data = pop)
+fit_vancouver <- lm(vancouver ~ poly(year, order), data = pop)
+
+pop_annual <- tibble(year = 1950:2035)
+pop_annual$kyoto <- predict(fit_kyoto, newdata = pop_annual)
+pop_annual$liestal <- predict(fit_liestal, newdata = pop_annual)
+pop_annual$washingtondc <- predict(fit_washingtondc, newdata = pop_annual)
+pop_annual$vancouver <- predict(fit_vancouver, newdata = pop_annual)
+
+ggplot() +
+  geom_point(aes(x = year, y = value), color = "red",
+             data = pop %>% gather("city", "value", -year)) +
+  geom_point(aes(x = year, y = value),
+                 data = pop_annual %>% gather("city", "value", -year)) +
+  facet_wrap(~ city, scales = "free")
+```
+
+```{r}
+city_pop <- pop_annual %>% 
+  filter(year < 2032) %>%
+  pivot_longer(cols = kyoto:vancouver, names_to = "location", values_to = "population") 
+
+city_pop <- tibble(city_pop %>% filter(location == "kyoto")) %>%
+  bind_rows(tibble(city_pop %>% filter(location == "liestal"))) %>%
+  bind_rows(tibble(city_pop %>% filter(location == "washingtondc"))) %>%
+  bind_rows(tibble(city_pop %>% filter(location == "vancouver"))) %>%
+  group_by(location)
+```
+
+```{r}
+temp_pop <- temperature_predictions %>%
+  left_join(city_pop, by = c("location", "year")) 
+
+cherry_new <-full_join(cherry, temp_pop, by = c("location", "year"))
+```
+
+## Fitting regression models
+
+We use only the interaction effect of "Winter" and "Spring" since those variables in the model have a perfect linear relationship.
+Two regression models are set with data except for "liestal" city, and then we predict the blooming days of the "liestal" city by using each model.
+As comparing the means of the absolute deviations between the abserved "bloom_doy" and the predicted "bloom_doy", we can prove that the population variable makes an impact on the blooming days. 
+In the "cherry_fit2" model with the "population" variable, the mean (12.286) is smaller than the mean (20.988) in the "cherry_fit" model.
+
+```{r}
+cor(cherry_new$Winter, cherry_new$Spring)
+```
+
+```{r}
+cherry_fit <- lm(bloom_doy ~ poly(year, 4) + Winter:Spring, 
+                 data = cherry_new %>% filter(location != "liestal"))
+summary(cherry_fit)
+pred_liestal <- predict(cherry_fit,  cherry_new %>% filter(location == "liestal"))
+mean(abs(pred_liestal - cherry_new %>% filter(location == "liestal") %>% pull(bloom_doy)), 
+     na.rm = TRUE)
+```
+
+```{r}
+cherry_fit2 <- lm(bloom_doy ~ population + poly(year, 4) + Winter:Spring, 
+                  data = cherry_new %>% filter(location != "liestal"))
+summary(cherry_fit2)
+pred_liestal <- predict(cherry_fit2,  cherry_new %>% filter(location == "liestal"))
+mean(abs(pred_liestal - cherry_new %>% filter(location == "liestal") %>% pull(bloom_doy)), 
+     na.rm = TRUE)
+```
+
+## Predicting the peak bloom
+
+```{r}
+cherry_new2 <- cherry_new %>% ungroup %>%
+  mutate(predicted_doy = round(predict(cherry_fit2, cherry_new)))
+
+predictions <- cherry_new2 %>%
+  filter(year > 2021 & year < 2032) %>% 
+  select(location, year, predicted_doy) %>% 
+  pivot_wider(names_from = location, values_from = predicted_doy)
+
+```
+
+## Saving the submission file
+
+```{r, eval=FALSE}
+write.csv(predictions, file = "cherry-predictions.csv",
+          row.names = FALSE)
+```
+
+
+
+
