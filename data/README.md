@@ -47,5 +47,5 @@ Copyright holder Yasuyuki AONO (aono(at)envi.osakafu-u.ac.jp). The data was obta
 5. City_populations
 
 It includes only the four cities, which is from UN World Urbanization Prospects (https://population.un.org/wup/Download/).
-    Four cities - Kyoto (Japan), Liestal-Weideli (Switzerland), Washington, D.C. (USA),  and Vancouver, BC (Canada)
+Four cities are Kyoto (Japan), Liestal-Weideli (Switzerland), Washington, D.C. (USA),  and Vancouver, BC (Canada).
 
