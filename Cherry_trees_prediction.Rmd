@@ -1,7 +1,7 @@
 ---
 title: "Prediction of Cherry Trees Blooming"
 author: "Asma Adimi, Moon Kum Seo, Joethi Silva Rojas, Jillian Wright"
-date: "02/22/2022"
+date: "02/28/2022"
 output:
   pdf_document:
     df_print: kable
@@ -95,8 +95,6 @@ historic_temperatures <-
   bind_rows(tibble(location = "vancouver", get_temperature("CA001108395")))
 ```
 
-We then predict the peak bloom date in two steps. Step 1 extrapolates average winter and spring temperature until 2031 using simple linear regression. Step 2 predicts the peak bloom date given the extrapolated temperatures, again using simple linear regression. 
-
 ## Extrapolating the average seasonal maximum temperature
 
 ```{r}
@@ -175,7 +173,7 @@ As comparing the means of the absolute deviations between the abserved "bloom_do
 In the "cherry_fit2" model with the "population" variable, the mean (12.286) is smaller than the mean (20.988) in the "cherry_fit" model.
 
 ```{r}
-cor(cherry_new$Winter, cherry_new$Spring)
+cor(cherry_new[2:6], cherry_new[2:6])
 ```
 
 ```{r}
@@ -199,14 +197,33 @@ mean(abs(pred_liestal - cherry_new %>% filter(location == "liestal") %>% pull(bl
 ## Predicting the peak bloom
 
 ```{r}
-cherry_new2 <- cherry_new %>% ungroup %>%
-  mutate(predicted_doy = round(predict(cherry_fit2, cherry_new)))
+#' Small helper function to convert the day of year to
+#' the actual date.
+#' 
+#' @param year year as an integer
+#' @param doy day of the year as integer (1 means January 1st)
+#' @return date string
+doy_to_date <- function (year, doy) {
+  strptime(paste(year, doy, sep = '-'), '%Y-%j') %>% # create date object
+    strftime('%Y-%m-%d') # translate back to date string in ISO 8601 format
+}
 
+cherry_new2 <- cherry_new %>% ungroup %>%
+  mutate(predicted_doy = round(predict(cherry_fit2, cherry_new))) %>%
+  mutate(predicted_date = doy_to_date(year, predicted_doy))
+
+predicted_date_2022 <- cherry_new2 %>%
+  filter(year == 2022) %>%
+  select(location, predicted_doy, predicted_date)
+predicted_date_2022
+```
+
+
+```{r}
 predictions <- cherry_new2 %>%
   filter(year > 2021 & year < 2032) %>% 
   select(location, year, predicted_doy) %>% 
   pivot_wider(names_from = location, values_from = predicted_doy)
-
 ```
 
 ## Saving the submission file
